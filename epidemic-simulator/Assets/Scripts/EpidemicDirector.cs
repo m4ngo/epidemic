@@ -10,29 +10,44 @@ public class EpidemicDirector : MonoBehaviour
 
     [Header("Resident Data")]
     [SerializeField] private List<Resident> residents = new List<Resident>();
+    [Header("Buildings")]
+    [SerializeField] private Transform[] buildings;
+    public enum BuildingType{
+        OFFICE,
+        SCHOOL,
+        RECREATION,
+        HOUSE
+    }
+    [SerializeField] private BuildingType[] buildingTypes;
 
     private void Start()
     {
         for (int i = 0; i < residentCount; i++)
         {
             int age = AgeDistribution(Random.Range(1f, 100f));
-            residents.Add(new Resident(age));
+            Resident res = new Resident(age);
+            residents.Add(res);
+            // PrintSchedule(res);
         }
-        PrintSchedule(residents[0]);
+
+        for (int i = 0; i < buildingTypes.Length; i++){
+            
+        }
     }
 
     void PrintSchedule(Resident resident)
     {
+        string output = "";
         for (int i = 0; i < 7; i++)
         {
-            string output = "[";
+            output += "[";
             for (int j = 0; j < 24; j++)
             {
-                output += resident.schedule.weeklyRoutine[i,j].ToString().Substring(0,2) + ", ";
+                output += resident.schedule.weeklyRoutine[i,j].ToString().Substring(0,2) + (j != 23 ? ", " : "");
             }
-            output += "]";
-            print(output);
+            output += "]\n";
         }
+        print(output);
     }
 
     public static int AgeDistribution(float x)
@@ -45,7 +60,7 @@ public class EpidemicDirector : MonoBehaviour
 [System.Serializable]
 public class Resident
 {
-    public static string nameChunk = "asteriosmaximilianbrunhildelisaalyssadomitillaseppstyopasakchainataliyaprasadfarrahendricus";
+    public static string nameChunk = "asteriosalyssamaximilianbrunhildelisadomitillaseppstyopasakchainataliyaprasadfarrahendricus";
     public static string leadCharacter = "AAAASDFJHGSHKFHFDGHSGLKJFHGSDGGHAFDJLKGHALSFWWTTTTTTTPPPPPMMMMNNBBCCCCZYXQUPIURYTQWERTYUIOPLKJHGFDSAZXCVBNM";
 
     public enum Role
@@ -60,6 +75,10 @@ public class Resident
     public int age;
     public float immuneStrength;
     public Schedule schedule;
+
+    //locations
+    public int house;
+    public int schoolOrWork;
 
     public Resident(int age)
     {
@@ -85,7 +104,48 @@ public class Resident
 
     void GenerateWeeklyRoutine()
     {
+        Schedule.Action[,] schedule = this.schedule.weeklyRoutine;
+        SetActionBlock(schedule, 5, 5, 14, 14, 0, 7, Schedule.Action.HOME, true);
 
+        if(role != Role.FREERIDER){
+            SetActionBlock(schedule, 16, 18, 2, 6, 0, 5, Schedule.Action.FREETIME, true);
+            SetActionBlock(schedule, 6, 16, 4, 8, 5, 7, Schedule.Action.FREETIME, true);
+        }else{
+            SetActionBlock(schedule, 6, 11, 4, 12, 0, 7, Schedule.Action.FREETIME, true);
+        }
+
+        //set errands
+        if(role == Role.WORKER) {
+            SetActionBlock(schedule, 17, 17, 1, 5, 0, 5, Schedule.Action.ERRANDS, true);
+            SetActionBlock(schedule, 8, 16, 1, 4, 5, 7, Schedule.Action.ERRANDS, true);
+        }
+        if(role == Role.FREERIDER && age > 10) {
+            SetActionBlock(schedule, 12, 20, 1, 5, 0, 5, Schedule.Action.ERRANDS, true);
+            SetActionBlock(schedule, 10, 18, 0, 2, 5, 7, Schedule.Action.ERRANDS, true);
+        }
+
+        //set school or work
+        if(role == Role.STUDENT) SetActionBlock(schedule, 8, 8, 7, 7, 0, 5, Schedule.Action.SCHOOL, true);
+        if(role == Role.WORKER) SetActionBlock(schedule, 9, 9, 8, 8, 0, 5, Schedule.Action.WORKING, true);
+
+        //set sleep
+        int sleepStart = this.schedule.sleepStart;
+        int sleepEnd = this.schedule.sleepEnd;
+        int sleepTime = 24 - sleepStart;
+        SetActionBlock(schedule, 0, 0, sleepEnd, sleepEnd, 0, 7, Schedule.Action.SLEEPING, false);
+        SetActionBlock(schedule, sleepStart, sleepStart, sleepTime, sleepTime, 0, 7, Schedule.Action.SLEEPING, false);
+    }
+
+    void SetActionBlock(Schedule.Action[,] schedule, int startMin, int startMax, int spaceMin, int spaceMax, int dayStart, int dayEnd, Schedule.Action action, bool rerandomize = false){
+        int start = Random.Range(startMin, startMax);
+        int space = Random.Range(spaceMin, spaceMax);
+        for(int i = dayStart; i < dayEnd; i++){
+            for(int j = start; j < start+space; j++){
+                schedule[i,j] = action;
+            }
+            start = Random.Range(startMin, startMax);
+            space = Random.Range(spaceMin, spaceMax);
+        }
     }
 
     void GenerateName()
@@ -102,13 +162,13 @@ public class Resident
     void FindRole()
     {
         role = Role.FREERIDER;
-        if(age > 5)
+        if(age >= 5)
         {
             role = Role.STUDENT;
         }
-        if (age > 20)
+        if (age > 23)
         {
-            float freeriderChance =  Mathf.Pow((age / 75f), 4f);
+            float freeriderChance = Mathf.Pow((age / 78f), 4f);
             role = Role.WORKER;
             if (Random.Range(0f, 1f) <= freeriderChance)
             {
@@ -123,12 +183,12 @@ public class Schedule
 {
     public enum Action
     {
-        SLEEPING,
         FREETIME,
-        WORKING,
-        SCHOOL,
         ERRANDS,
-        HOME
+        HOME,
+        SCHOOL,
+        WORKING,
+        SLEEPING
     }
 
     public Action[,] weeklyRoutine;
