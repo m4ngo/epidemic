@@ -10,9 +10,9 @@ using Unity.Rendering;
 partial struct ResidentSystem : ISystem
 {
     // World attributes
-    public const int BUILDINGS_X_BOUNDS = 19;
-    public const int BUILDINGS_Y_BOUNDS = 10;
-    public const int AMOUNT_OF_RESIDENTS = 50000;
+    public const int BUILDINGS_X_BOUNDS = 26;
+    public const int BUILDINGS_Y_BOUNDS = 15;
+    public const int AMOUNT_OF_RESIDENTS = 100000;
 
     // Resident attributes
     public const int VIRUS_LENGTH = 2;
@@ -21,9 +21,9 @@ partial struct ResidentSystem : ISystem
     public const float TRANSITION_TIME = 1.5f;
 
     // Resident colors
-    public float4 susceptible;
-    public float4 infected;
-    public float4 recovered;
+    public static readonly float[] SUSCEPTIBLE = { 80f/ 255f, 212f/255f, 35f/255f, 1f };
+    public static readonly float[] INFECTED = { 224f/255f, 29f/255f, 9f/255f, 1f };
+    public static readonly float[] RECOVERED = { 90f/255f, 106f/255f, 111f/255f, 1f };
 
     private EntityQuery residentQuery;
 
@@ -46,10 +46,6 @@ partial struct ResidentSystem : ISystem
         timer = 0f;
         stagesElapsed = 0;
         numOfRooms = (BUILDINGS_X_BOUNDS * 2 + 1) * (BUILDINGS_Y_BOUNDS * 2 + 1);
-
-        susceptible = new float4(0.33f, 1f, 0f, 1f);
-        infected = new float4(1f, 0.16f, 0.16f, 1f);
-        recovered = new float4(0.5f, 0.5f, 0.5f, 1f);
     }
 
     [BurstCompile]
@@ -107,10 +103,7 @@ partial struct ResidentSystem : ISystem
                 {
                     array = roomHasInfected,
                     rand = m_Random,
-                    stagesElapsed = stagesElapsed,
-                    susceptible = susceptible,
-                    infected = infected,
-                    recovered = recovered
+                    stagesElapsed = stagesElapsed
                 }.ScheduleParallel(residentQuery, infectionStateHandle).Complete();
 
                 currentState = WorldState.DECIDE_ROOMS;
@@ -171,9 +164,6 @@ partial struct ResidentSystem : ISystem
         [ReadOnly] public NativeArray<int> array;
         [ReadOnly] public Random rand;
         [ReadOnly] public int stagesElapsed;
-        [ReadOnly] public float4 susceptible;
-        [ReadOnly] public float4 infected;
-        [ReadOnly] public float4 recovered;
 
         [BurstCompile]
         public void Execute(ref ResidentComponent res, ref URPMaterialPropertyBaseColor color, ref LocalTransform transform)
@@ -186,7 +176,7 @@ partial struct ResidentSystem : ISystem
                     transform.Position = new float3(transform.Position.xy, -0.1f);
                     res.state = ViralState.INFECTED;
                     res.timeInfected = stagesElapsed;
-                    color.Value = infected;
+                    color.Value = new float4(INFECTED[0], INFECTED[1], INFECTED[2], INFECTED[3]);
                 }
             }
             else if (res.state == ViralState.INFECTED)
@@ -195,7 +185,7 @@ partial struct ResidentSystem : ISystem
                 {
                     transform.Position = new float3(transform.Position.xy, 0.1f);
                     res.state = ViralState.RECOVERED;
-                    color.Value = recovered;
+                    color.Value = new float4(RECOVERED[0], RECOVERED[1], RECOVERED[2], RECOVERED[3]);
                 }
             }
         }

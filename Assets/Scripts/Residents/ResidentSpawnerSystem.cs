@@ -3,6 +3,7 @@ using Unity.Entities;
 using Unity.Collections;
 using Unity.Mathematics;
 using Unity.Rendering;
+using Unity.Transforms;
 
 partial struct ResidentSpawnerSystem : ISystem, ISystemStartStop
 {
@@ -18,8 +19,6 @@ partial struct ResidentSpawnerSystem : ISystem, ISystemStartStop
 
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
         Random m_Random = Random.CreateFromIndex((uint)(SystemAPI.Time.ElapsedTime * 1000));
-        float4 susceptible = new float4(0.33f, 1f, 0f, 1f);
-        float4 infected = new float4(1f, 0.16f, 0.16f, 1f);
 
         for (int i = 0; i < ResidentSystem.AMOUNT_OF_RESIDENTS; i++) // Spawn residents
         {
@@ -31,8 +30,14 @@ partial struct ResidentSpawnerSystem : ISystem, ISystemStartStop
             });
             ecb.AddComponent(newEntity, new URPMaterialPropertyBaseColor
             {
-                Value = i == 0 ? infected : susceptible
+                Value = i == 0 ? 
+                new float4(ResidentSystem.INFECTED[0], ResidentSystem.INFECTED[1], ResidentSystem.INFECTED[2], ResidentSystem.INFECTED[3]) : 
+                new float4(ResidentSystem.SUSCEPTIBLE[0], ResidentSystem.SUSCEPTIBLE[1], ResidentSystem.SUSCEPTIBLE[2], ResidentSystem.SUSCEPTIBLE[3])
             });
+            if (i == 0)
+            {
+                ecb.SetComponent(newEntity, new LocalTransform { Position = new float3(0, 0, -0.1f) });
+            }
         }
 
         ecb.Playback(state.EntityManager);
