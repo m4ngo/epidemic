@@ -15,7 +15,7 @@ public class ResidentGraphManager : MonoBehaviour
     {
         em = World.DefaultGameObjectInjectionWorld.EntityManager;
         eq = new EntityQueryBuilder(Allocator.Temp).WithAll<ResidentComponent>().Build(em);
-        InvokeRepeating("UpdateGraphs", 0f, 1.3f);
+        InvokeRepeating("UpdateGraphs", 0f, 0.1f);
     }
 
 

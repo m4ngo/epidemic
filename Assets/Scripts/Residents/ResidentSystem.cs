@@ -15,10 +15,11 @@ partial struct ResidentSystem : ISystem
     public const int AMOUNT_OF_RESIDENTS = 100000;
 
     // Resident attributes
-    public const int VIRUS_LENGTH = 2;
-    public const float CHANCE_OF_INFECTION = 0.1f;
-    public const float TRANSITION_SPEED = 15.0f;
-    public const float TRANSITION_TIME = 1.5f;
+    public const int VIRUS_LENGTH = 4;
+    public const int RECOVERED_LENGTH = 30;
+    public const float CHANCE_OF_INFECTION = 0.1f; // for an R_0 of ~2.5
+    public const float TRANSITION_SPEED = 25.0f;
+    public const float TRANSITION_TIME = 0.1f;
 
     // Resident colors
     public static readonly float[] SUSCEPTIBLE = { 80f/ 255f, 212f/255f, 35f/255f, 1f };
@@ -123,7 +124,7 @@ partial struct ResidentSystem : ISystem
         [BurstCompile]
         public void Execute(ref ResidentComponent res, ref LocalTransform transform)
         {
-            transform.Position = math.lerp(transform.Position, new float3(res.targetRoom + res.offset, transform.Position.z), TRANSITION_SPEED * deltaTime);
+            transform.Position = new float3(res.targetRoom + res.offset, transform.Position.z); // math.lerp(transform.Position, new float3(res.targetRoom + res.offset, transform.Position.z), TRANSITION_SPEED * deltaTime);
         }
     }
 
@@ -186,6 +187,15 @@ partial struct ResidentSystem : ISystem
                     transform.Position = new float3(transform.Position.xy, 0.1f);
                     res.state = ViralState.RECOVERED;
                     color.Value = new float4(RECOVERED[0], RECOVERED[1], RECOVERED[2], RECOVERED[3]);
+                }
+            }
+            else if (res.state == ViralState.RECOVERED)
+            {
+                if (stagesElapsed - (res.timeInfected + VIRUS_LENGTH) >= RECOVERED_LENGTH)
+                {
+                    transform.Position = new float3(transform.Position.xy, 0f);
+                    res.state = ViralState.SUSCEPTIBLE;
+                    color.Value = new float4(SUSCEPTIBLE[0], SUSCEPTIBLE[1], SUSCEPTIBLE[2], SUSCEPTIBLE[3]);
                 }
             }
         }
