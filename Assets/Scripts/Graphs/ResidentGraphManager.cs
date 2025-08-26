@@ -7,6 +7,7 @@ public class ResidentGraphManager : MonoBehaviour
     [SerializeField] private GraphHandler sLine;
     [SerializeField] private GraphHandler iLine;
     [SerializeField] private GraphHandler rLine;
+    [SerializeField] private GraphHandler vLine;
 
     private EntityManager em;
     private EntityQuery eq;
@@ -15,7 +16,7 @@ public class ResidentGraphManager : MonoBehaviour
     {
         em = World.DefaultGameObjectInjectionWorld.EntityManager;
         eq = new EntityQueryBuilder(Allocator.Temp).WithAll<ResidentComponent>().Build(em);
-        InvokeRepeating("UpdateGraphs", 0f, 0.1f);
+        InvokeRepeating("UpdateGraphs", 0f, ResidentSystem.TRANSITION_TIME);
     }
 
 
@@ -25,6 +26,7 @@ public class ResidentGraphManager : MonoBehaviour
 
         int recovered = 0;
         int infected = 0;
+        int vaccinated = 0;
 
         foreach (Entity e in res)
         {
@@ -37,12 +39,17 @@ public class ResidentGraphManager : MonoBehaviour
             {
                 recovered++;
             }
+            else if (state == ViralState.VACCINATED)
+            {
+                vaccinated++;
+            }
         }
 
         int total = ResidentSystem.AMOUNT_OF_RESIDENTS;
-        sLine.AddPoint((float)(total - recovered - infected) / (float)total);
+        sLine.AddPoint((float)(total - recovered - infected - vaccinated) / (float)total);
         iLine.AddPoint((float)(infected) / (float)total);
         rLine.AddPoint((float)(recovered) / (float)total);
+        vLine.AddPoint((float)(vaccinated) / (float)total);
 
         res.Dispose();
     }

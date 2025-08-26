@@ -17,14 +17,16 @@ partial struct ResidentSystem : ISystem
     // Resident attributes
     public const int VIRUS_LENGTH = 4;
     public const int RECOVERED_LENGTH = 30;
-    public const float CHANCE_OF_INFECTION = 0.1f; // for an R_0 of ~2.5
-    public const float TRANSITION_SPEED = 25.0f;
+    public const float CHANCE_OF_INFECTION = 0.1f;
+    public const float CHANCE_OF_VACCINATION = 0.005f;
     public const float TRANSITION_TIME = 0.1f;
+    public const bool ANIMATED = false;
 
     // Resident colors
     public static readonly float[] SUSCEPTIBLE = { 80f/ 255f, 212f/255f, 35f/255f, 1f };
     public static readonly float[] INFECTED = { 224f/255f, 29f/255f, 9f/255f, 1f };
     public static readonly float[] RECOVERED = { 90f/255f, 106f/255f, 111f/255f, 1f };
+    public static readonly float[] VACCINATED = { 15f/255f, 138f/255f, 188f/255f, 1f };
 
     private EntityQuery residentQuery;
 
@@ -124,7 +126,7 @@ partial struct ResidentSystem : ISystem
         [BurstCompile]
         public void Execute(ref ResidentComponent res, ref LocalTransform transform)
         {
-            transform.Position = new float3(res.targetRoom + res.offset, transform.Position.z); // math.lerp(transform.Position, new float3(res.targetRoom + res.offset, transform.Position.z), TRANSITION_SPEED * deltaTime);
+            transform.Position = ANIMATED ? math.lerp(transform.Position, new float3(res.targetRoom + res.offset, transform.Position.z), (10f / TRANSITION_TIME) * deltaTime) : new float3(res.targetRoom + res.offset, transform.Position.z);
         }
     }
 
@@ -170,6 +172,17 @@ partial struct ResidentSystem : ISystem
         public void Execute(ref ResidentComponent res, ref URPMaterialPropertyBaseColor color, ref LocalTransform transform)
         {
             int key = HashedRoom(res.targetRoom);
+
+            if (res.state != ViralState.INFECTED) // Only non-infected residents have a chance to become vaccinated
+            {
+                if (rand.NextFloat() <= CHANCE_OF_VACCINATION)
+                {
+                    transform.Position = new float3(transform.Position.xy, 0.05f);
+                    res.state = ViralState.VACCINATED;
+                    color.Value = new float4(VACCINATED[0], VACCINATED[1], VACCINATED[2], VACCINATED[3]);
+                }
+            }
+
             if (res.state == ViralState.SUSCEPTIBLE)
             {
                 if (array[key] > 0 && rand.NextFloat() <= CHANCE_OF_INFECTION)

@@ -5,7 +5,8 @@ public enum ViralState
 {
     SUSCEPTIBLE,
     INFECTED,
-    RECOVERED
+    RECOVERED,
+    VACCINATED
 }
 
 public struct ResidentComponent : IComponentData
