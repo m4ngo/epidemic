@@ -16,6 +16,7 @@ partial struct ResidentSystem : ISystem
 
     // Resident attributes
     public const int VIRUS_LENGTH = 4;
+    public const int VIRUS_DAYS_PER_MUTATION = 60;
     public const int RECOVERED_LENGTH = 30;
     public const float CHANCE_OF_INFECTION = 0.1f;
     public const float CHANCE_OF_VACCINATION = 0.005f;
@@ -41,6 +42,7 @@ partial struct ResidentSystem : ISystem
     private float timer;
     private int stagesElapsed;
     private int numOfRooms;
+    private int timeUntilMutation;
 
     public void OnCreate(ref SystemState state)
     {
@@ -49,6 +51,7 @@ partial struct ResidentSystem : ISystem
         timer = 0f;
         stagesElapsed = 0;
         numOfRooms = (BUILDINGS_X_BOUNDS * 2 + 1) * (BUILDINGS_Y_BOUNDS * 2 + 1);
+        timeUntilMutation = VIRUS_DAYS_PER_MUTATION;
     }
 
     [BurstCompile]
@@ -93,6 +96,7 @@ partial struct ResidentSystem : ISystem
                 break;
             case WorldState.AWAIT_STAGE_END:
 
+                timeUntilMutation--;
                 NativeArray<int> roomHasInfected = new NativeArray<int>(numOfRooms, Allocator.TempJob);
 
                 JobHandle setInfectedHandle = default;
@@ -106,12 +110,17 @@ partial struct ResidentSystem : ISystem
                 {
                     array = roomHasInfected,
                     rand = m_Random,
-                    stagesElapsed = stagesElapsed
+                    stagesElapsed = stagesElapsed,
+                    mutated = timeUntilMutation <= 0
                 }.ScheduleParallel(residentQuery, infectionStateHandle).Complete();
 
                 currentState = WorldState.DECIDE_ROOMS;
                 // Set the in-world time elapsed
                 stagesElapsed++;
+                if(timeUntilMutation <= 0)
+                {
+                    timeUntilMutation = VIRUS_DAYS_PER_MUTATION;
+                }
 
                 roomHasInfected.Dispose();
                 break;
@@ -167,6 +176,7 @@ partial struct ResidentSystem : ISystem
         [ReadOnly] public NativeArray<int> array;
         [ReadOnly] public Random rand;
         [ReadOnly] public int stagesElapsed;
+        [ReadOnly] public bool mutated;
 
         [BurstCompile]
         public void Execute(ref ResidentComponent res, ref URPMaterialPropertyBaseColor color, ref LocalTransform transform)
@@ -175,7 +185,13 @@ partial struct ResidentSystem : ISystem
 
             if (res.state != ViralState.INFECTED) // Only non-infected residents have a chance to become vaccinated
             {
-                if (rand.NextFloat() <= CHANCE_OF_VACCINATION)
+                if (mutated)
+                {
+                    transform.Position = new float3(transform.Position.xy, 0f);
+                    res.state = ViralState.SUSCEPTIBLE;
+                    color.Value = new float4(SUSCEPTIBLE[0], SUSCEPTIBLE[1], SUSCEPTIBLE[2], SUSCEPTIBLE[3]);
+                }
+                else if (rand.NextFloat() <= CHANCE_OF_VACCINATION)
                 {
                     transform.Position = new float3(transform.Position.xy, 0.05f);
                     res.state = ViralState.VACCINATED;
