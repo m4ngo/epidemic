@@ -5,8 +5,7 @@ public enum ViralState
 {
     SUSCEPTIBLE,
     INFECTED,
-    RECOVERED,
-    VACCINATED
+    RECOVERED
 }
 
 public struct ResidentComponent : IComponentData
@@ -15,4 +14,5 @@ public struct ResidentComponent : IComponentData
     public int2 targetRoom;
     public float2 offset;
     public int timeInfected;
+    public float gene;
 }

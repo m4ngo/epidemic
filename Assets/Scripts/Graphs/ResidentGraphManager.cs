@@ -7,7 +7,6 @@ public class ResidentGraphManager : MonoBehaviour
     [SerializeField] private GraphHandler sLine;
     [SerializeField] private GraphHandler iLine;
     [SerializeField] private GraphHandler rLine;
-    [SerializeField] private GraphHandler vLine;
 
     private EntityManager em;
     private EntityQuery eq;
@@ -26,7 +25,6 @@ public class ResidentGraphManager : MonoBehaviour
 
         int recovered = 0;
         int infected = 0;
-        int vaccinated = 0;
 
         foreach (Entity e in res)
         {
@@ -39,17 +37,12 @@ public class ResidentGraphManager : MonoBehaviour
             {
                 recovered++;
             }
-            else if (state == ViralState.VACCINATED)
-            {
-                vaccinated++;
-            }
         }
 
         int total = ResidentSystem.AMOUNT_OF_RESIDENTS;
-        sLine.AddPoint((float)(total - recovered - infected - vaccinated) / (float)total);
+        sLine.AddPoint((float)(total - recovered - infected) / (float)total);
         iLine.AddPoint((float)(infected) / (float)total);
         rLine.AddPoint((float)(recovered) / (float)total);
-        vLine.AddPoint((float)(vaccinated) / (float)total);
 
         res.Dispose();
     }
