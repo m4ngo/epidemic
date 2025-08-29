@@ -767,7 +767,6 @@ MonoBehaviour:
   sLine: {fileID: 1240887417}
   iLine: {fileID: 649354627}
   rLine: {fileID: 147606442}
-  vLine: {fileID: 201767596}
 --- !u!1 &1240887414
 GameObject:
   m_ObjectHideFlags: 0
@@ -937,7 +936,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!212 &1322556134
 SpriteRenderer:
   m_ObjectHideFlags: 0

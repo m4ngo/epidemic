@@ -14,5 +14,5 @@ public struct ResidentComponent : IComponentData
     public int2 targetRoom;
     public float2 offset;
     public int timeInfected;
-    public float gene;
+    public int gene;
 }

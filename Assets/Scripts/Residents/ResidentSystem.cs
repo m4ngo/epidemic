@@ -17,6 +17,8 @@ partial struct ResidentSystem : ISystem
     // Resident attributes
     public const int VIRUS_LENGTH = 4;
     public const float CHANCE_OF_INFECTION = 0.1f;
+    public const float CHANCE_OF_MUTATION = 0.0005f;
+    public const int IMMUNITY_THRESHOLD = 20;
     public const float TRANSITION_TIME = 0.1f;
     public const bool ANIMATED = false;
 
@@ -91,18 +93,18 @@ partial struct ResidentSystem : ISystem
                 break;
             case WorldState.AWAIT_STAGE_END:
 
-                NativeArray<int> roomHasInfected = new NativeArray<int>(numOfRooms, Allocator.TempJob);
+                NativeParallelMultiHashMap<int, int> roomHasInfected = new NativeParallelMultiHashMap<int, int>(AMOUNT_OF_RESIDENTS, Allocator.TempJob);
 
                 JobHandle setInfectedHandle = default;
                 new SetInfectedRoom
                 {
-                    array = roomHasInfected
+                    roomMap = roomHasInfected.AsParallelWriter()
                 }.Schedule(residentQuery, setInfectedHandle).Complete();
 
                 JobHandle infectionStateHandle = default;
                 new InfectionState
                 {
-                    array = roomHasInfected,
+                    roomMap = roomHasInfected,
                     rand = m_Random,
                     stagesElapsed = stagesElapsed,
                 }.ScheduleParallel(residentQuery, infectionStateHandle).Complete();
@@ -137,8 +139,8 @@ partial struct ResidentSystem : ISystem
         public void Execute(ref ResidentComponent res)
         {
             res.targetRoom = new int2(
-                 rand.NextInt(-BUILDINGS_X_BOUNDS, BUILDINGS_X_BOUNDS + 1),
-                 rand.NextInt(-BUILDINGS_Y_BOUNDS, BUILDINGS_Y_BOUNDS + 1)
+                math.clamp(res.targetRoom.x + rand.NextInt(-1, 2), -BUILDINGS_X_BOUNDS, BUILDINGS_X_BOUNDS),
+                math.clamp(res.targetRoom.y + rand.NextInt(-1, 2), -BUILDINGS_Y_BOUNDS, BUILDINGS_Y_BOUNDS)
                  );
         }
     }
@@ -146,7 +148,7 @@ partial struct ResidentSystem : ISystem
     [BurstCompile]
     private partial struct SetInfectedRoom : IJobEntity
     {
-        public NativeArray<int> array;
+        public NativeParallelMultiHashMap<int, int>.ParallelWriter roomMap;
 
         [BurstCompile]
         public void Execute(ref ResidentComponent res)
@@ -154,35 +156,63 @@ partial struct ResidentSystem : ISystem
             int key = HashedRoom(res.targetRoom);
             if (res.state == ViralState.INFECTED)
             {
-                array[key]++;
+                roomMap.Add(key, res.gene);
             }
         }
+    }
+
+    private static bool SetInfectedState(ref ResidentComponent res, ref URPMaterialPropertyBaseColor color, ref LocalTransform transform, ref Random rand, int stagesElapsed, int gene)
+    {
+        if (gene - res.gene >= IMMUNITY_THRESHOLD)
+        {
+            if (rand.NextFloat() <= CHANCE_OF_INFECTION)
+            {
+                int mutatedGene = gene;
+                if (rand.NextFloat() <= CHANCE_OF_MUTATION)
+                {
+                    mutatedGene = gene + 20;
+                }
+                transform.Position = new float3(transform.Position.xy, -(mutatedGene % 256 / 255f));
+                res.state = ViralState.INFECTED;
+                res.timeInfected = stagesElapsed;
+                res.gene = mutatedGene;
+                color.Value = new float4((1.0f - (mutatedGene % 256) / 255f), INFECTED[1], (mutatedGene % 256) / 255f, INFECTED[3]);
+            }
+            return true;
+        }
+        return false;
     }
 
     [BurstCompile]
     private partial struct InfectionState : IJobEntity
     {
-        [ReadOnly] public NativeArray<int> array;
+        [ReadOnly] public NativeParallelMultiHashMap<int, int> roomMap;
         [ReadOnly] public Random rand;
         [ReadOnly] public int stagesElapsed;
-        [ReadOnly] public bool mutated;
 
         [BurstCompile]
         public void Execute(ref ResidentComponent res, ref URPMaterialPropertyBaseColor color, ref LocalTransform transform)
         {
             int key = HashedRoom(res.targetRoom);
 
-            if (res.state == ViralState.SUSCEPTIBLE)
+            if (res.state != ViralState.INFECTED)
             {
-                if (array[key] > 0 && rand.NextFloat() <= CHANCE_OF_INFECTION)
+                if (roomMap.TryGetFirstValue(key, out int gene, out var iterator))
                 {
-                    transform.Position = new float3(transform.Position.xy, -0.1f);
-                    res.state = ViralState.INFECTED;
-                    res.timeInfected = stagesElapsed;
-                    color.Value = new float4(INFECTED[0], INFECTED[1], INFECTED[2], INFECTED[3]);
+                    if (SetInfectedState(ref res, ref color, ref transform, ref rand, stagesElapsed, gene))
+                    {
+                        return;
+                    }
+                    while (roomMap.TryGetNextValue(out gene, ref iterator))
+                    {
+                        if (SetInfectedState(ref res, ref color, ref transform, ref rand, stagesElapsed, gene))
+                        {
+                            return;
+                        }
+                    }
                 }
             }
-            else if (res.state == ViralState.INFECTED)
+            else
             {
                 if (stagesElapsed - res.timeInfected >= VIRUS_LENGTH)
                 {
