@@ -10,15 +10,16 @@ using Unity.Rendering;
 partial struct ResidentSystem : ISystem
 {
     // World attributes
-    public const int BUILDINGS_X_BOUNDS = 26;
-    public const int BUILDINGS_Y_BOUNDS = 15;
+    public const int BUILDINGS_X_BOUNDS = 39;
+    public const int BUILDINGS_Y_BOUNDS = 23;
     public const int AMOUNT_OF_RESIDENTS = 100000;
+    public const float ROOM_SIZE = 0.5f;
 
     // Resident attributes
     public const int VIRUS_LENGTH = 4;
     public const float CHANCE_OF_INFECTION = 0.1f;
     public const float CHANCE_OF_MUTATION = 0.0001f;
-    public const int RECOVERY_TIME = 40;
+    public const int RECOVERY_TIME = 60;
     public const int IMMUNITY_THRESHOLD = 20;
     public const float TRANSITION_TIME = 0.1f;
     public const bool ANIMATED = false;
@@ -26,7 +27,7 @@ partial struct ResidentSystem : ISystem
     // Resident colors
     public static readonly float[] SUSCEPTIBLE = { 80f/ 255f, 212f/255f, 35f/255f, 1f };
     public static readonly float[] INFECTED = { 224f/255f, 29f/255f, 9f/255f, 1f };
-    public static readonly float[] RECOVERED = { 90f/255f, 106f/255f, 111f/255f, 1f };
+    public static readonly float[] RECOVERED = { 60f/255f, 60f/255f, 60f/255f, 1f };
     public static readonly float[] VACCINATED = { 15f/255f, 138f/255f, 188f/255f, 1f };
 
     private EntityQuery residentQuery;
@@ -127,7 +128,7 @@ partial struct ResidentSystem : ISystem
         [BurstCompile]
         public void Execute(ref ResidentComponent res, ref LocalTransform transform)
         {
-            transform.Position = ANIMATED ? math.lerp(transform.Position, new float3(res.targetRoom + res.offset, transform.Position.z), (10f / TRANSITION_TIME) * deltaTime) : new float3(res.targetRoom + res.offset, transform.Position.z);
+            transform.Position = ANIMATED ? math.lerp(transform.Position, new float3((float2)res.targetRoom * ROOM_SIZE + res.offset, transform.Position.z), (10f / TRANSITION_TIME) * deltaTime) : new float3((float2)res.targetRoom * ROOM_SIZE + res.offset, transform.Position.z);
         }
     }
 
