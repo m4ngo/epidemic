@@ -17,10 +17,11 @@ partial struct ResidentSystem : ISystem
 
     // Resident attributes
     public const int VIRUS_LENGTH = 7;
-    public const float CHANCE_OF_INFECTION = 0.5f;
+    public const float CHANCE_OF_INFECTION = 0.1f;
     public const float CHANCE_OF_MUTATION = 0.0001f;
     public const float CHANCE_OF_DEATH = 0.01f;
     public const float CHANCE_OF_REVIVE = 0.25f;
+    public const int IMMUNITY_PERIOD = 60;
     public const int MAX_MOVE = 2;
     public const int IMMUNITY_THRESHOLD = 20;
     public const float TRANSITION_TIME = 0.1f;
@@ -206,6 +207,15 @@ partial struct ResidentSystem : ISystem
 
             if (res.state != ViralState.INFECTED)
             {
+                if (res.state == ViralState.RECOVERED && stagesElapsed - res.timeInfected >= IMMUNITY_PERIOD + VIRUS_LENGTH)
+                {
+                    transform.Position = new float3(transform.Position.xy, 0f);
+                    res.state = ViralState.SUSCEPTIBLE;
+                    res.gene = -999;
+                    color.Value = new float4(SUSCEPTIBLE[0], SUSCEPTIBLE[1], SUSCEPTIBLE[2], SUSCEPTIBLE[3]);
+                    return;
+                }
+
                 if (res.state == ViralState.DEAD && rand.NextFloat() <= CHANCE_OF_REVIVE)
                 {
                     transform.Position = new float3(transform.Position.xy, 0f);
