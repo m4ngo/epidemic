@@ -16,10 +16,12 @@ partial struct ResidentSystem : ISystem
     public const float ROOM_SIZE = 0.5f;
 
     // Resident attributes
-    public const int VIRUS_LENGTH = 4;
-    public const float CHANCE_OF_INFECTION = 0.1f;
+    public const int VIRUS_LENGTH = 7;
+    public const float CHANCE_OF_INFECTION = 0.5f;
     public const float CHANCE_OF_MUTATION = 0.0001f;
-    public const int RECOVERY_TIME = 60;
+    public const float CHANCE_OF_DEATH = 0.01f;
+    public const float CHANCE_OF_REVIVE = 0.25f;
+    public const int MAX_MOVE = 2;
     public const int IMMUNITY_THRESHOLD = 20;
     public const float TRANSITION_TIME = 0.1f;
     public const bool ANIMATED = false;
@@ -29,6 +31,7 @@ partial struct ResidentSystem : ISystem
     public static readonly float[] INFECTED = { 224f/255f, 29f/255f, 9f/255f, 1f };
     public static readonly float[] RECOVERED = { 60f/255f, 60f/255f, 60f/255f, 1f };
     public static readonly float[] VACCINATED = { 15f/255f, 138f/255f, 188f/255f, 1f };
+    public static readonly float[] DEAD = { 10f/255f, 10f/255f, 10f/255f, 1f };
 
     private EntityQuery residentQuery;
 
@@ -140,9 +143,13 @@ partial struct ResidentSystem : ISystem
         [BurstCompile]
         public void Execute(ref ResidentComponent res)
         {
+            if(res.state == ViralState.DEAD)
+            {
+                return;
+            }
             res.targetRoom = new int2(
-                math.clamp(res.targetRoom.x + rand.NextInt(-1, 2), -BUILDINGS_X_BOUNDS, BUILDINGS_X_BOUNDS),
-                math.clamp(res.targetRoom.y + rand.NextInt(-1, 2), -BUILDINGS_Y_BOUNDS, BUILDINGS_Y_BOUNDS)
+                math.clamp(res.targetRoom.x + rand.NextInt(-MAX_MOVE, MAX_MOVE + 1), -BUILDINGS_X_BOUNDS, BUILDINGS_X_BOUNDS),
+                math.clamp(res.targetRoom.y + rand.NextInt(-MAX_MOVE, MAX_MOVE + 1), -BUILDINGS_Y_BOUNDS, BUILDINGS_Y_BOUNDS)
                  );
         }
     }
@@ -199,7 +206,7 @@ partial struct ResidentSystem : ISystem
 
             if (res.state != ViralState.INFECTED)
             {
-                if (res.state == ViralState.RECOVERED && stagesElapsed - res.timeInfected >= RECOVERY_TIME + VIRUS_LENGTH)
+                if (res.state == ViralState.DEAD && rand.NextFloat() <= CHANCE_OF_REVIVE)
                 {
                     transform.Position = new float3(transform.Position.xy, 0f);
                     res.state = ViralState.SUSCEPTIBLE;
@@ -227,9 +234,18 @@ partial struct ResidentSystem : ISystem
             {
                 if (stagesElapsed - res.timeInfected >= VIRUS_LENGTH)
                 {
-                    transform.Position = new float3(transform.Position.xy, 0.1f);
-                    res.state = ViralState.RECOVERED;
-                    color.Value = new float4(RECOVERED[0], RECOVERED[1], RECOVERED[2], RECOVERED[3]);
+                    if (rand.NextFloat() <= CHANCE_OF_DEATH)
+                    {
+                        transform.Position = new float3(transform.Position.xy, 0.05f);
+                        res.state = ViralState.DEAD;
+                        color.Value = new float4(DEAD[0], DEAD[1], DEAD[2], DEAD[3]);
+                    }
+                    else
+                    {
+                        transform.Position = new float3(transform.Position.xy, 0.1f);
+                        res.state = ViralState.RECOVERED;
+                        color.Value = new float4(RECOVERED[0], RECOVERED[1], RECOVERED[2], RECOVERED[3]);
+                    }
                 }
             }
         }
