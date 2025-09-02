@@ -1,6 +1,7 @@
 ## Epidemic Simulator
 
 *Video compression hates my simulator... too many little guys I guess*
+
 https://github.com/user-attachments/assets/576b3315-616c-428a-a1af-d3d26ebcd6cf
 
 ### Introduction
