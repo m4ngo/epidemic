@@ -1,3 +1,8 @@
+## Epidemic Simulator
+
+*Video compression hates my simulator... too many little guys I guess*
+https://github.com/user-attachments/assets/576b3315-616c-428a-a1af-d3d26ebcd6cf
+
 ### Introduction
 This is a brief outline of my creation/thought process of an infectious disease simulator. The goal is to create a simulation based on the SIR model that encapsulates a mutating ‘flu-like’ virus. Ideally, I’ll be able to write a simple simulation that emulates the flu’s periodic infection rates.
 
