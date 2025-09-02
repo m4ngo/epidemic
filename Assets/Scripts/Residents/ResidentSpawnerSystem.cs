@@ -31,7 +31,9 @@ partial struct ResidentSpawnerSystem : ISystem, ISystemStartStop
                  ),
                 state = i == 0 ? ViralState.INFECTED : ViralState.SUSCEPTIBLE,
                 offset = (m_Random.NextFloat2() - new float2(ResidentSystem.ROOM_SIZE / 2)),
-                gene = i == 0 ? 1 : -999
+                gene = i == 0 ? 1 : -999,
+                timeInfected = i == 0 ? 0 : -999,
+                original = i == 0
             });
             ecb.AddComponent(newEntity, new URPMaterialPropertyBaseColor
             {

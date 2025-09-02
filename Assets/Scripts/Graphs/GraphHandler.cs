@@ -8,7 +8,7 @@ public class GraphHandler : MonoBehaviour
     [SerializeField] private float scaledHeight;
     private List<float> points = new List<float>();
 
-    public void AddPoint(float value)
+    public int AddPoint(float value)
     {
         line.positionCount++;
         points.Add(value);
@@ -19,5 +19,23 @@ public class GraphHandler : MonoBehaviour
             pos[i] = new Vector2(increment * i, points[i] * scaledHeight);
         }
         line.SetPositions(pos);
+        return line.positionCount - 1;
+    }
+
+    public void SetPoint(float value, int index)
+    {
+        line.SetPosition(index, new Vector2(line.GetPosition(index).x, value * scaledHeight));
+    }
+
+    public void AddOrSetPoint(float value, int index)
+    {
+        if (index >= points.Count)
+        {
+            AddPoint(value);
+        }
+        else
+        {
+            SetPoint(value, index);
+        }
     }
 }

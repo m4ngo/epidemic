@@ -9,22 +9,27 @@ using Unity.Rendering;
 [BurstCompile]
 partial struct ResidentSystem : ISystem
 {
+    // Monte Carlo settings
+    public const int ITERATIONS = 100;
+    public const int ITERATION_LENGTH = 500;
+    public const int STEPS_PER_FRAME = 10;
+
     // World attributes
-    public const int BUILDINGS_X_BOUNDS = 39;
-    public const int BUILDINGS_Y_BOUNDS = 23;
-    public const int AMOUNT_OF_RESIDENTS = 100000;
-    public const float ROOM_SIZE = 0.5f;
+    public const int BUILDINGS_X_BOUNDS = 13;
+    public const int BUILDINGS_Y_BOUNDS = 8;
+    public const int AMOUNT_OF_RESIDENTS = 10000;
+    public const float ROOM_SIZE = 1f;
 
     // Resident attributes
     public const int VIRUS_LENGTH = 7;
-    public const float CHANCE_OF_INFECTION = 0.1f;
-    public const float CHANCE_OF_MUTATION = 0.0001f;
-    public const float CHANCE_OF_DEATH = 0.01f;
-    public const float CHANCE_OF_REVIVE = 0.25f;
-    public const int IMMUNITY_PERIOD = 60;
-    public const int MAX_MOVE = 2;
+    public const float CHANCE_OF_INFECTION = 0.2f;
+    public const float CHANCE_OF_MUTATION = 0.001f;
+    public const float CHANCE_OF_DEATH = 0.5f;
+    public const float CHANCE_OF_REVIVE = 0.2f;
+    public const int IMMUNITY_PERIOD = 30;
+    public const int MAX_MOVE = 1;
     public const int IMMUNITY_THRESHOLD = 20;
-    public const float TRANSITION_TIME = 0.1f;
+    public const float TRANSITION_TIME = 0f;
     public const bool ANIMATED = false;
 
     // Resident colors
@@ -64,63 +69,72 @@ partial struct ResidentSystem : ISystem
 
         Random m_Random = Random.CreateFromIndex((uint)(SystemAPI.Time.ElapsedTime * 1000));
 
-        switch (currentState)
+        for (int i = 0; i < STEPS_PER_FRAME; i++)
         {
-            case WorldState.DECIDE_ROOMS:
+            switch (currentState)
+            {
+                case WorldState.DECIDE_ROOMS:
 
-                JobHandle decideRoomHandle = default;
-                new DecideRoom
-                {
-                    rand = m_Random
-                }.ScheduleParallel(residentQuery, decideRoomHandle).Complete();
-                currentState = WorldState.TRANSITION;
-                timer = TRANSITION_TIME;
-
-                break;
-            case WorldState.TRANSITION:
-
-                // Don't immediately move; gives viewer time to see which residents got infected
-                if (timer <= TRANSITION_TIME / 2f)
-                {
-                    JobHandle moveTowardTargetHandle = default;
-                    new MoveTowardTarget
+                    JobHandle decideRoomHandle = default;
+                    new DecideRoom
                     {
-                        deltaTime = SystemAPI.Time.DeltaTime
-                    }.ScheduleParallel(residentQuery, moveTowardTargetHandle).Complete();
-                }
+                        rand = m_Random,
+                        timeElapsed = stagesElapsed
+                    }.ScheduleParallel(residentQuery, decideRoomHandle).Complete();
+                    currentState = WorldState.TRANSITION;
+                    timer = TRANSITION_TIME;
 
-                // Move to next stage after a slight delay
-                timer -= SystemAPI.Time.DeltaTime;
-                if(timer <= 0)
-                {
-                    currentState = WorldState.AWAIT_STAGE_END;
-                }
+                    break;
+                case WorldState.TRANSITION:
 
-                break;
-            case WorldState.AWAIT_STAGE_END:
+                    // Don't immediately move; gives viewer time to see which residents got infected
+                    if (timer <= TRANSITION_TIME / 2f)
+                    {
+                        JobHandle moveTowardTargetHandle = default;
+                        new MoveTowardTarget
+                        {
+                            deltaTime = SystemAPI.Time.DeltaTime
+                        }.ScheduleParallel(residentQuery, moveTowardTargetHandle).Complete();
+                    }
 
-                NativeParallelMultiHashMap<int, int> roomHasInfected = new NativeParallelMultiHashMap<int, int>(AMOUNT_OF_RESIDENTS, Allocator.TempJob);
+                    // Move to next stage after a slight delay
+                    timer -= SystemAPI.Time.DeltaTime;
+                    if (timer <= 0)
+                    {
+                        currentState = WorldState.AWAIT_STAGE_END;
+                    }
 
-                JobHandle setInfectedHandle = default;
-                new SetInfectedRoom
-                {
-                    roomMap = roomHasInfected.AsParallelWriter()
-                }.Schedule(residentQuery, setInfectedHandle).Complete();
+                    break;
+                case WorldState.AWAIT_STAGE_END:
 
-                JobHandle infectionStateHandle = default;
-                new InfectionState
-                {
-                    roomMap = roomHasInfected,
-                    rand = m_Random,
-                    stagesElapsed = stagesElapsed,
-                }.ScheduleParallel(residentQuery, infectionStateHandle).Complete();
+                    NativeParallelMultiHashMap<int, int> roomHasInfected = new NativeParallelMultiHashMap<int, int>(AMOUNT_OF_RESIDENTS, Allocator.TempJob);
 
-                currentState = WorldState.DECIDE_ROOMS;
-                // Set the in-world time elapsed
-                stagesElapsed++;
+                    JobHandle setInfectedHandle = default;
+                    new SetInfectedRoom
+                    {
+                        roomMap = roomHasInfected.AsParallelWriter()
+                    }.Schedule(residentQuery, setInfectedHandle).Complete();
 
-                roomHasInfected.Dispose();
-                break;
+                    JobHandle infectionStateHandle = default;
+                    new InfectionState
+                    {
+                        roomMap = roomHasInfected,
+                        rand = m_Random,
+                        stagesElapsed = stagesElapsed,
+                    }.ScheduleParallel(residentQuery, infectionStateHandle).Complete();
+
+                    currentState = WorldState.DECIDE_ROOMS;
+                    // Set the in-world time elapsed
+                    stagesElapsed++;
+                    if (stagesElapsed > ITERATION_LENGTH)
+                    {
+                        stagesElapsed = 0;
+                        MultiGraphHandler.Instance.CreateNewGraph();
+                    }
+
+                    roomHasInfected.Dispose();
+                    break;
+            }
         }
     }
 
@@ -140,6 +154,7 @@ partial struct ResidentSystem : ISystem
     private partial struct DecideRoom : IJobEntity
     {
         [ReadOnly] public Random rand;
+        [ReadOnly] public int timeElapsed;
 
         [BurstCompile]
         public void Execute(ref ResidentComponent res)
@@ -148,10 +163,37 @@ partial struct ResidentSystem : ISystem
             {
                 return;
             }
-            res.targetRoom = new int2(
-                math.clamp(res.targetRoom.x + rand.NextInt(-MAX_MOVE, MAX_MOVE + 1), -BUILDINGS_X_BOUNDS, BUILDINGS_X_BOUNDS),
-                math.clamp(res.targetRoom.y + rand.NextInt(-MAX_MOVE, MAX_MOVE + 1), -BUILDINGS_Y_BOUNDS, BUILDINGS_Y_BOUNDS)
-                 );
+            if (timeElapsed == ITERATION_LENGTH)
+            {
+                res.targetRoom = new int2(
+                 rand.NextInt(-BUILDINGS_X_BOUNDS, BUILDINGS_X_BOUNDS + 1),
+                 rand.NextInt(-BUILDINGS_Y_BOUNDS, BUILDINGS_Y_BOUNDS + 1)
+                     );
+            }
+            else
+            {
+                int2 newPos = new int2(
+                    (res.targetRoom.x + rand.NextInt(-MAX_MOVE, MAX_MOVE + 1)),
+                    (res.targetRoom.y + rand.NextInt(-MAX_MOVE, MAX_MOVE + 1))
+                     );
+                if (newPos.x > BUILDINGS_X_BOUNDS)
+                {
+                    newPos.x = -BUILDINGS_X_BOUNDS;
+                }
+                if (newPos.x < -BUILDINGS_X_BOUNDS)
+                {
+                    newPos.x = BUILDINGS_X_BOUNDS;
+                }
+                if (newPos.y > BUILDINGS_Y_BOUNDS)
+                {
+                    newPos.y = -BUILDINGS_Y_BOUNDS;
+                }
+                if (newPos.y < -BUILDINGS_Y_BOUNDS)
+                {
+                    newPos.y = BUILDINGS_Y_BOUNDS;
+                }
+                res.targetRoom = newPos;
+            }
         }
     }
 
@@ -203,6 +245,27 @@ partial struct ResidentSystem : ISystem
         [BurstCompile]
         public void Execute(ref ResidentComponent res, ref URPMaterialPropertyBaseColor color, ref LocalTransform transform)
         {
+            if(stagesElapsed == ITERATION_LENGTH)
+            {
+                if (res.original)
+                {
+                    transform.Position = new float3(transform.Position.xy, -0.1f);
+                    res.state = ViralState.INFECTED;
+                    res.timeInfected = 0;
+                    res.gene = 1;
+                    color.Value = new float4(INFECTED[0], 0, INFECTED[2], INFECTED[3]);
+                }
+                else
+                {
+                    transform.Position = new float3(transform.Position.xy, 0f);
+                    res.state = ViralState.SUSCEPTIBLE;
+                    res.gene = -999;
+                    res.timeInfected = -999;
+                    color.Value = new float4(SUSCEPTIBLE[0], SUSCEPTIBLE[1], SUSCEPTIBLE[2], SUSCEPTIBLE[3]);
+                }
+                return;
+            }
+
             int key = HashedRoom(res.targetRoom);
 
             if (res.state != ViralState.INFECTED)
